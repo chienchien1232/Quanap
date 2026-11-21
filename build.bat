@@ -109,6 +109,9 @@ if errorlevel 1 goto :fail
 echo - 12_workflow_tests.sql
 %SQLCMD% -b -i "%DBDIR%\12_workflow_tests.sql"
 if errorlevel 1 goto :fail
+echo - 13_edge_case_tests.sql
+%SQLCMD% -b -i "%DBDIR%\13_edge_case_tests.sql"
+if errorlevel 1 goto :fail
 goto :done
 
 
@@ -197,8 +200,18 @@ if errorlevel 1 exit /b 1
 exit /b 0
 
 :upgrade_workflow
-echo - Cập nhật luồng tiếp nhận, xét duyệt và đăng bán
+echo - Dong bo trigger, view va procedure theo source hien tai
+%SQLCMD% -b -i "%DBDIR%\02_triggers.sql"
+if errorlevel 1 exit /b %ERRORLEVEL%
+%SQLCMD% -b -i "%DBDIR%\03_views.sql"
+if errorlevel 1 exit /b %ERRORLEVEL%
+%SQLCMD% -b -i "%DBDIR%\04_procedures.sql"
+if errorlevel 1 exit /b %ERRORLEVEL%
+echo - Cap nhat luong tiep nhan, xet duyet va dang ban
 %SQLCMD% -b -i "%DBDIR%\11_tach_luong_ky_gui.sql"
+if errorlevel 1 exit /b %ERRORLEVEL%
+echo - Siet rang buoc toan ven du lieu
+%SQLCMD% -b -i "%DBDIR%\14_hardening.sql"
 exit /b %ERRORLEVEL%
 
 

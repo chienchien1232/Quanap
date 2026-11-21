@@ -22,7 +22,7 @@ internal sealed class frmLapDonHang : Form
 
     private readonly TextBox _txtSearch = Theme.TextBox(null, 196);
     private readonly DataGridView _gridProducts = new();
-    private readonly NumericUpDown _numDiscount = Theme.Number(100_000_000m, 110);
+    private readonly NumericUpDown _numDiscount = Theme.Number(Theme.PriceMax, 110);
     private readonly Label _lblProductCount = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.Muted };
 
     private readonly DataGridView _gridDraft = new();
@@ -38,8 +38,9 @@ internal sealed class frmLapDonHang : Form
     private readonly Button _payButton = Theme.PrimaryButton("Thu tiền", 120);
     private readonly Button _completeButton = Theme.GoldButton("Hoàn tất đơn", 140);
     private readonly Button _cancelButton = Theme.GhostButton("Hủy đơn", 100);
+    private readonly Button _pendingButton = Theme.GhostButton("Giao dịch treo", 150);
     private bool _loadingOrders;
-    private readonly NumericUpDown _numPay = Theme.Number(1_000_000_000m, 120);
+    private readonly NumericUpDown _numPay = Theme.Number(Theme.MoneyMax, 120);
     private readonly ComboBox _cboMethod = Theme.Combo(104);
     private readonly ComboBox _cboPayStatus = Theme.Combo(104);
     private readonly TextBox _txtTxn = Theme.TextBox(null, 120);
@@ -435,16 +436,17 @@ internal sealed class frmLapDonHang : Form
         _paymentFields.SetColumnSpan(note, 2);
         paymentLayout.Controls.Add(_paymentFields, 0, 1);
 
-        var actions = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = new Padding(0) };
-        for (var i = 0; i < 3; i++) actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / 3));
-        var buttons = new[] { _payButton, _completeButton, _cancelButton };
+        var actions = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1, Margin = new Padding(0) };
+        for (var i = 0; i < 4; i++) actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        var buttons = new[] { _payButton, _completeButton, _pendingButton, _cancelButton };
         for (var i = 0; i < buttons.Length; i++) {
             buttons[i].Dock = DockStyle.Fill;
-            buttons[i].Margin = new Padding(0, 2, i == 2 ? 0 : 8, 4);
+            buttons[i].Margin = new Padding(0, 2, i == buttons.Length - 1 ? 0 : 8, 4);
             actions.Controls.Add(buttons[i], i, 0);
         }
         _payButton.Click += (_, _) => RecordPayment();
         _completeButton.Click += (_, _) => CompleteOrder();
+        _pendingButton.Click += (_, _) => ResolvePendingPayments();
         _cancelButton.Click += (_, _) => CancelOrder();
         paymentLayout.Controls.Add(actions, 0, 2);
         var cancelRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
@@ -652,6 +654,7 @@ ORDER BY NgayLap DESC, MaDH DESC;");
             _numPay.Value = 0;
             _paymentFields.Enabled = false;
             _payButton.Enabled = _completeButton.Enabled = _cancelButton.Enabled = false;
+            _pendingButton.Enabled = false;
             _txtCancelReason.Enabled = false;
             return;
         }
@@ -670,6 +673,9 @@ ORDER BY NgayLap DESC, MaDH DESC;");
         _payButton.Enabled = canPay;
         _completeButton.Enabled = status == "Đang xử lý" && paid >= total;
         _cancelButton.Enabled = status == "Chờ thanh toán" && paid == 0;
+        _pendingButton.Enabled = Db.Long(
+            "SELECT COUNT(*) FROM dbo.THANH_TOAN_DON_HANG WHERE MaDH = @MaDH AND TrangThai = N'Chờ xử lý'",
+            Db.Param("@MaDH", id)) > 0;
         _txtCancelReason.Enabled = _cancelButton.Enabled;
         if (changed)
         {
@@ -679,7 +685,7 @@ ORDER BY NgayLap DESC, MaDH DESC;");
             _lblOrderMessage.Text = "";
         }
         if (!canPay) _numPay.Value = 0;
-        else if (changed || _numPay.Value == 0) _numPay.Value = Math.Min(_numPay.Maximum, remain);
+        else if (changed || _numPay.Value == 0) _numPay.Value = Math.Min(Theme.MoneyMax, remain);
     }
     private void AddSelectedProduct()
     {
@@ -695,16 +701,16 @@ ORDER BY NgayLap DESC, MaDH DESC;");
         var name = Convert.ToString(row.Cells["TenSP"].Value) ?? "";
         var size = Convert.ToString(row.Cells["KichThuoc"].Value) ?? "";
         var price = Convert.ToDecimal(row.Cells["GiaDangBan"].Value);
-        var discount = _numDiscount.Value;
+        var discount = Theme.MoneyValue(_numDiscount);
 
         if (_draft.Rows.Cast<DataRow>().Any(x => Convert.ToInt32(x["MaSP"]) == maSp))
         {
             _lblDraftError.Text = "Sản phẩm này đã có trong đơn nháp.";
             return;
         }
-        if (discount > price)
+        if (discount * 2 > price)
         {
-            _lblDraftError.Text = "Giảm giá không được lớn hơn giá niêm yết.";
+            _lblDraftError.Text = "Giảm giá không được vượt quá 50% giá niêm yết.";
             return;
         }
 
@@ -748,6 +754,17 @@ ORDER BY NgayLap DESC, MaDH DESC;");
             return;
         }
 
+        /* Giữ nguyên giây: CSDL so sánh NgayLap với NgayDangBan (có giây).
+           Cắt giây sẽ khiến đơn lập trong cùng phút với lúc đăng bán bị chặn oan. */
+        var ngayLap = _dtpOrder.Value.Date + DateTime.Now.TimeOfDay;
+        var hanThanhToan = _dtpDue.Value.Date.AddHours(17);
+        if (hanThanhToan < ngayLap)
+        {
+            _lblDraftError.Text = "Hạn thanh toán phải sau thời điểm lập đơn. Chọn ngày hạn muộn hơn.";
+            _dtpDue.Focus();
+            return;
+        }
+
         try
         {
             var lines = Db.NewOrderLineTable();
@@ -763,8 +780,8 @@ ORDER BY NgayLap DESC, MaDH DESC;");
             using var cmd = new SqlCommand("dbo.sp_TaoDonHang", cn) { CommandType = CommandType.StoredProcedure };
             cmd.Parameters.AddWithValue("@MaKH", Convert.ToInt32(_buyer["MaKH"]));
             cmd.Parameters.AddWithValue("@MaNV", Convert.ToInt32(_cboEmployee.SelectedValue));
-            cmd.Parameters.AddWithValue("@NgayLap", _dtpOrder.Value.Date.AddHours(DateTime.Now.Hour).AddMinutes(DateTime.Now.Minute));
-            cmd.Parameters.AddWithValue("@HanThanhToan", _dtpDue.Value.Date.AddHours(17));
+            cmd.Parameters.AddWithValue("@NgayLap", ngayLap);
+            cmd.Parameters.AddWithValue("@HanThanhToan", hanThanhToan);
             cmd.Parameters.AddWithValue("@GhiChu", _txtNote.Text.Trim().Length == 0 ? DBNull.Value : _txtNote.Text.Trim());
             cmd.Parameters.Add(Db.Structured("@ChiTiet", "dbo.ChiTietDonHangType", lines));
             var output = new SqlParameter("@MaDH", SqlDbType.Int) { Direction = ParameterDirection.Output };
@@ -796,9 +813,15 @@ ORDER BY NgayLap DESC, MaDH DESC;");
             SetOrderMessage("Chọn một đơn hàng trước khi thu tiền.", true);
             return;
         }
-        if (_numPay.Value <= 0)
+        var soTien = Theme.MoneyValue(_numPay);
+        if (soTien <= 0)
         {
             SetOrderMessage("Số tiền thu phải lớn hơn 0.", true);
+            return;
+        }
+        if (!Theme.MoneyInRange(soTien, out var moneyError))
+        {
+            SetOrderMessage(moneyError!, true);
             return;
         }
 
@@ -807,7 +830,7 @@ ORDER BY NgayLap DESC, MaDH DESC;");
             using var cn = Db.Open();
             using var cmd = new SqlCommand("dbo.sp_GhiNhanThanhToan", cn) { CommandType = CommandType.StoredProcedure };
             cmd.Parameters.AddWithValue("@MaDH", _selected.Value.MaDH);
-            cmd.Parameters.AddWithValue("@SoTien", _numPay.Value);
+            cmd.Parameters.AddWithValue("@SoTien", soTien);
             cmd.Parameters.AddWithValue("@PhuongThuc", Convert.ToString(_cboMethod.SelectedItem));
             cmd.Parameters.AddWithValue("@TrangThai", Convert.ToString(_cboPayStatus.SelectedItem));
             cmd.Parameters.AddWithValue("@MaGiaoDich", _txtTxn.Text.Trim().Length == 0 ? DBNull.Value : _txtTxn.Text.Trim());
@@ -849,6 +872,54 @@ ORDER BY NgayLap DESC, MaDH DESC;");
         catch (Exception ex)
         {
             SetOrderMessage(Db.ErrorMessage(ex), true);
+        }
+    }
+
+    private void ResolvePendingPayments()
+    {
+        _lblOrderMessage.ForeColor = Theme.Muted;
+        _lblOrderMessage.Text = string.Empty;
+
+        if (_selected is null)
+        {
+            SetOrderMessage("Chọn một đơn hàng trước khi xử lý giao dịch treo.", true);
+            Log.Write("GD treo: không có đơn được chọn");
+            return;
+        }
+
+        var maDh = _selected.Value.MaDH;
+        var dangTreo = Db.Long(
+            "SELECT COUNT(*) FROM dbo.THANH_TOAN_DON_HANG WHERE MaDH = @MaDH AND TrangThai = N'Chờ xử lý'",
+            Db.Param("@MaDH", maDh));
+
+        Log.Write("GD treo: mở hộp thoại",
+            new (string, object?)[] { ("MaDH", maDh), ("GiaoDichCho", dangTreo), ("TrangThaiDon", _selected.Value.TrangThai) });
+
+        if (dangTreo == 0)
+        {
+            SetOrderMessage("Đơn này không có giao dịch nào đang chờ xử lý.", true);
+            Log.Write("GD treo: bỏ qua vì không có giao dịch chờ", output: new (string, object?)[] { ("GiaoDichCho", 0L) });
+            return;
+        }
+
+        try
+        {
+            using var dialog = new frmXuLyGiaoDichTreo(maDh);
+            /* frmLapDonHang bị nhúng vào frmMain (TopLevel = false) nên KHÔNG được
+               truyền nó làm owner — phải lấy cửa sổ cấp cao nhất. */
+            var ownerWindow = Parent?.FindForm() ?? FindForm();
+            var result = ownerWindow is null ? dialog.ShowDialog() : dialog.ShowDialog(ownerWindow);
+
+            Log.Write("GD treo: đóng hộp thoại",
+                output: new (string, object?)[] { ("DialogResult", result), ("DaThayDoi", dialog.Changed) });
+
+            LoadOrders(maDh);
+            LoadProducts();
+        }
+        catch (Exception ex)
+        {
+            SetOrderMessage("Không mở được hộp thoại giao dịch treo: " + Db.ErrorMessage(ex), true);
+            Log.Write("GD treo: LỖI", new (string, object?)[] { ("MaDH", maDh) }, error: ex);
         }
     }
 

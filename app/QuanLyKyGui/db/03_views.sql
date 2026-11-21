@@ -5,6 +5,30 @@ SET QUOTED_IDENTIFIER ON;
 GO
 
 /* ============================================================
+   Ham hoa hong dung chung — MOI NOI TINH HOA HONG PHAI QUA DAY
+   de khi doi ty le khong phai sua nhieu cho (tranh lech so lieu).
+   WITH SCHEMABINDING de SQL Server coi la deterministic, co the
+   dung trong cot computed PERSISTED va cho phep inline UDF.
+   ============================================================ */
+CREATE OR ALTER FUNCTION dbo.fn_HoaHong (@GiaBan DECIMAL(12,0))
+RETURNS DECIMAL(12,0)
+WITH SCHEMABINDING
+AS
+BEGIN
+    RETURN CAST(ROUND(@GiaBan * 0.20, 0) AS DECIMAL(12,0));
+END;
+GO
+
+CREATE OR ALTER FUNCTION dbo.fn_ThucNhan (@GiaBan DECIMAL(12,0))
+RETURNS DECIMAL(12,0)
+WITH SCHEMABINDING
+AS
+BEGIN
+    RETURN @GiaBan - CAST(ROUND(@GiaBan * 0.20, 0) AS DECIMAL(12,0));
+END;
+GO
+
+/* ============================================================
    vw_SanPham_DayDu - tra cứu sản phẩm kèm người ký gửi
    ============================================================ */
 CREATE OR ALTER VIEW dbo.vw_SanPham_DayDu
@@ -88,20 +112,23 @@ GO
 
 /* ============================================================
    vw_DoanhThu_TheoThang - doanh thu từ đơn đã hoàn tất
+   CONVERT(varchar(7), ..., 126) nhanh hơn FORMAT rất nhiều và
+   không phụ thuộc culture (FORMAT dùng .NET, sai năm nếu login
+   SQL Server đặt lịch khác Gregorian).
    ============================================================ */
 CREATE OR ALTER VIEW dbo.vw_DoanhThu_TheoThang
 AS
 SELECT
-    FORMAT(d.NgayLap, 'yyyy-MM') AS Thang,
+    CONVERT(varchar(7), d.NgayLap, 126) AS Thang,
     COUNT(DISTINCT d.MaDH) AS SoDon,
     COUNT(*) AS SoSanPham,
     SUM(c.GiaBanThucTe) AS DoanhThu,
-    SUM(CAST(ROUND(c.GiaBanThucTe * 0.20, 0) AS DECIMAL(12,0))) AS TienHoaHong,
-    SUM(c.GiaBanThucTe - CAST(ROUND(c.GiaBanThucTe * 0.20, 0) AS DECIMAL(12,0))) AS TienTraNguoiKyGui
+    SUM(dbo.fn_HoaHong(c.GiaBanThucTe)) AS TienHoaHong,
+    SUM(dbo.fn_ThucNhan(c.GiaBanThucTe)) AS TienTraNguoiKyGui
 FROM dbo.DON_HANG d
 JOIN dbo.CHI_TIET_DON_HANG c ON c.MaDH = d.MaDH
 WHERE d.TrangThai = N'Hoàn tất'
-GROUP BY FORMAT(d.NgayLap, 'yyyy-MM');
+GROUP BY CONVERT(varchar(7), d.NgayLap, 126);
 GO
 
 /* ============================================================
@@ -115,8 +142,8 @@ SELECT
     kh.SoDienThoai,
     COUNT(*) AS SoSanPhamChuaQuyetToan,
     SUM(c.GiaBanThucTe) AS TongGiaBan,
-    SUM(CAST(ROUND(c.GiaBanThucTe * 0.20, 0) AS DECIMAL(12,0))) AS TienHoaHong,
-    SUM(c.GiaBanThucTe - CAST(ROUND(c.GiaBanThucTe * 0.20, 0) AS DECIMAL(12,0))) AS TienPhaiTra
+    SUM(dbo.fn_HoaHong(c.GiaBanThucTe)) AS TienHoaHong,
+    SUM(dbo.fn_ThucNhan(c.GiaBanThucTe)) AS TienPhaiTra
 FROM dbo.CHI_TIET_DON_HANG c
 JOIN dbo.DON_HANG d ON d.MaDH = c.MaDH AND d.TrangThai = N'Hoàn tất'
 JOIN dbo.SAN_PHAM sp ON sp.MaSP = c.MaSP
@@ -265,8 +292,8 @@ SELECT
     kh.HoTen AS TenNguoiKyGui,
     kh.SoDienThoai,
     c.GiaBanThucTe AS GiaBan,
-    CAST(ROUND(c.GiaBanThucTe * 0.20, 0) AS DECIMAL(12,0)) AS TienHoaHong,
-    c.GiaBanThucTe - CAST(ROUND(c.GiaBanThucTe * 0.20, 0) AS DECIMAL(12,0)) AS TienThucNhan,
+    dbo.fn_HoaHong(c.GiaBanThucTe) AS TienHoaHong,
+    dbo.fn_ThucNhan(c.GiaBanThucTe) AS TienThucNhan,
     ct.MaCTTTKG,
     ptt.MaPTTKG,
     ISNULL(ptt.TrangThai, N'Chưa quyết toán') AS TrangThaiQuyetToan,

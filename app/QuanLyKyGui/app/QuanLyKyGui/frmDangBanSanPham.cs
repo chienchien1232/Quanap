@@ -3,7 +3,7 @@ namespace QuanLyKyGui;
 /// <summary>Hộp thoại nhập giá và đăng bán một sản phẩm đã được chấp nhận.</summary>
 internal sealed class frmDangBanSanPham : Form
 {
-    private readonly NumericUpDown _numPrice = Theme.Number(500_000_000m, 220);
+    private readonly NumericUpDown _numPrice = Theme.Number(Theme.MoneyMax, 220);
     private readonly Label _lblError = new()
     {
         AutoSize = false,
@@ -14,7 +14,7 @@ internal sealed class frmDangBanSanPham : Form
     };
 
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
-    public decimal Price => _numPrice.Value;
+    public decimal Price => Theme.MoneyValue(_numPrice);
 
     public frmDangBanSanPham(string productName, decimal currentPrice)
     {
@@ -63,7 +63,7 @@ internal sealed class frmDangBanSanPham : Form
         root.Controls.Add(titles, 0, 0);
         root.Controls.Add(Fields.Field("Giá đăng bán *", _numPrice), 0, 1);
 
-        if (currentPrice > 0) _numPrice.Value = Math.Min(currentPrice, 500_000_000m);
+        if (currentPrice > 0) _numPrice.Value = Math.Min(currentPrice, Theme.PriceMax);
         root.Controls.Add(_lblError, 0, 2);
 
         var hint = new Label
@@ -94,9 +94,16 @@ internal sealed class frmDangBanSanPham : Form
 
     private void Confirm()
     {
-        if (_numPrice.Value <= 0)
+        var price = Theme.MoneyValue(_numPrice);
+        if (price <= 0)
         {
             _lblError.Text = "Giá đăng bán phải lớn hơn 0.";
+            _numPrice.Focus();
+            return;
+        }
+        if (!Theme.PriceInRange(price, out var error))
+        {
+            _lblError.Text = error;
             _numPrice.Focus();
             return;
         }

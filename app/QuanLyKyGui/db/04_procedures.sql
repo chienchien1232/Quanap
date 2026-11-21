@@ -85,6 +85,8 @@ BEGIN
         THROW 51008, N'Thương hiệu sản phẩm không tồn tại.', 1;
     IF EXISTS (SELECT 1 FROM @SanPham WHERE GiaDeXuat < 0)
         THROW 51009, N'Giá đề xuất không được âm.', 1;
+    IF EXISTS (SELECT 1 FROM @SanPham WHERE GiaDeXuat > 500000000)
+        THROW 51012, N'Giá đề xuất không được vượt quá 500.000.000 đ.', 1;
     IF EXISTS (SELECT 1 FROM @SanPham WHERE GiaDangBan IS NOT NULL)
         THROW 51011, N'Chưa nhập giá đăng bán ở bước tiếp nhận. Giá được chốt khi đăng bán.', 1;
 
@@ -112,8 +114,7 @@ GO
 CREATE PROCEDURE dbo.sp_DuyetSanPham
     @MaSP INT,
     @KetQua NVARCHAR(20),
-    @GiaDangBan DECIMAL(12,0) = NULL,
-    @GhiChu NVARCHAR(500) = NULL
+    @GiaDangBan DECIMAL(12,0) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -175,6 +176,8 @@ BEGIN
         SET @GiaDangBan = ISNULL(@GiaDangBan, @GiaHienTai);
         IF @GiaDangBan IS NULL OR @GiaDangBan <= 0
             THROW 51204, N'Phải chốt giá đăng bán lớn hơn 0 trước khi đưa sản phẩm lên bán.', 1;
+        IF @GiaDangBan > 500000000
+            THROW 51205, N'Giá đăng bán không được vượt quá 500.000.000 đ.', 1;
         UPDATE dbo.SAN_PHAM
         SET GiaDangBan = @GiaDangBan, TrangThaiBan = N'Đang bán', NgayDangBan = ISNULL(NgayDangBan, SYSDATETIME())
         WHERE MaSP = @MaSP;
@@ -529,8 +532,7 @@ GO
    sp_TraHang - trả sản phẩm chưa bán cho người ký gửi
    ============================================================ */
 CREATE PROCEDURE dbo.sp_TraHang
-    @MaSP   INT,
-    @GhiChu NVARCHAR(500) = NULL
+    @MaSP INT
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -618,18 +620,18 @@ BEGIN
         THROW 52001, N'Khoảng thời gian báo cáo không hợp lệ.', 1;
 
     SELECT
-        FORMAT(d.NgayLap, 'yyyy-MM') AS Thang,
+        CONVERT(varchar(7), d.NgayLap, 126) AS Thang,
         COUNT(DISTINCT d.MaDH) AS SoDon,
         COUNT(*) AS SoSanPham,
         SUM(c.GiaBanThucTe) AS DoanhThu,
-        SUM(CAST(ROUND(c.GiaBanThucTe * 0.20, 0) AS DECIMAL(12,0))) AS TienHoaHong,
-        SUM(c.GiaBanThucTe - CAST(ROUND(c.GiaBanThucTe * 0.20, 0) AS DECIMAL(12,0))) AS TienTraNguoiKyGui
+        SUM(dbo.fn_HoaHong(c.GiaBanThucTe)) AS TienHoaHong,
+        SUM(dbo.fn_ThucNhan(c.GiaBanThucTe)) AS TienTraNguoiKyGui
     FROM dbo.DON_HANG d
     JOIN dbo.CHI_TIET_DON_HANG c ON c.MaDH = d.MaDH
     WHERE d.TrangThai = N'Hoàn tất'
       AND d.NgayLap >= CAST(@TuNgay AS DATETIME2(0))
       AND d.NgayLap < DATEADD(DAY, 1, CAST(@DenNgay AS DATETIME2(0)))
-    GROUP BY FORMAT(d.NgayLap, 'yyyy-MM')
+    GROUP BY CONVERT(varchar(7), d.NgayLap, 126)
     ORDER BY Thang;
 END
 GO

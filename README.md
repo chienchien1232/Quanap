@@ -174,6 +174,11 @@ tại chỗ, không mở cửa sổ rời. Nút **Đóng** trong từng trang đ
   Đang giữ / Đã bán / Đã trả lại), đơn (Chờ thanh toán / Đang xử lý / Hoàn tất / Đã hủy).
 - `07_validation.sql`: **18/18** bất biến nghiệp vụ đạt.
 - `08_negative_tests.sql`: **23/23** kịch bản vi phạm bị CSDL chặn (PASS).
+- `12_workflow_tests.sql`: **19/19** ca luồng tiếp nhận → xét duyệt → đăng bán đạt.
+- `13_edge_case_tests.sql`: **41/41** ca biên và hồi quy lỗi nghiệp vụ đạt.
+- `15_e2e_tests.sql`: **20/20** ca end-to-end (thêm khách → ký gửi → bán → thu tiền →
+  quyết toán → huỷ đơn → trả hàng → quản lý nhân viên).
+- Chạy tất cả: `build.bat test`.
 - Quy tắc trả thừa: đơn DH20 tổng 4.950.000 đ, đã thu 5.000.000 đ → đơn Hoàn tất,
   chênh lệch 50.000 đ hiển thị ở view `vw_DoiSoat_ThanhToan` với kết quả “Trả thừa”.
 
@@ -205,7 +210,18 @@ Sau khi chạy, nhớ chạy `_embed_images.ps1` để ảnh được nhúng tha
 ## 7. Quy tắc nghiệp vụ cốt lõi
 
 - Hoa hồng cố định **20%** giá bán thực tế, làm tròn đến đồng; tiền thực nhận = giá bán − hoa hồng.
+  Tỷ lệ này chỉ được khai báo một lần trong `dbo.fn_HoaHong` / `dbo.fn_ThucNhan`
+  (`03_views.sql`) — mọi view, báo cáo và cột computed đều gọi qua hàm này.
+- Giảm giá mỗi món tối đa **50%** giá niêm yết; vượt quá bị chặn ở cả giao diện và CSDL.
 - Chỉ sản phẩm **Đang bán** mới được thêm vào đơn; thêm vào đơn sẽ chuyển sang **Đang giữ**.
+- Chi tiết đơn hàng bị khoá sau khi đơn đã thu tiền hoặc đã rời trạng thái Chờ thanh toán.
+- Giao dịch thanh toán **Chờ xử lý** được xử lý bằng nút **Giao dịch treo** ở màn lập đơn;
+  huỷ đơn sẽ tự đóng các giao dịch treo thành **Thất bại**.
+- Sản phẩm **Đã trả lại** là trạng thái cuối, không đưa trở lại sàn.
+- Số điện thoại được chuẩn hoá (bỏ dấu cách, chấm, gạch nối) trước khi lưu; CSDL siết
+  bằng CHECK nên chỉ nhận dạng chuẩn.
+- Ghi chú khi trả hàng (`@GhiChu` của `sp_TraHang`) không được lưu lại vì bảng
+  `SAN_PHAM` không có cột lưu lý do — đây là giới hạn của phạm vi hiện tại.
 - Thu đủ tiền → đơn **Đang xử lý**, sản phẩm **Đã bán**; giao hàng xong → **Hoàn tất**.
 - Thanh toán vượt giá trị đơn được coi là **đã trả đủ**; phần chênh đối soát riêng.
 - Mỗi chi tiết đơn chỉ được quyết toán **một lần**; phiếu quyết toán chỉ gồm sản phẩm của

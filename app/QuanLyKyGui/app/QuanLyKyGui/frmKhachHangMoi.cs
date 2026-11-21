@@ -102,8 +102,8 @@ internal sealed class frmKhachHangMoi : Form
     private void SaveCustomer()
     {
         var name = _txtName.Text.Trim();
-        var phone = _txtPhone.Text.Trim();
-        var email = _txtEmail.Text.Trim();
+        var phone = Normalize.Phone(_txtPhone.Text);
+        var email = Normalize.Email(_txtEmail.Text);
         var address = _txtAddress.Text.Trim();
 
         if (name.Length == 0)
@@ -113,9 +113,9 @@ internal sealed class frmKhachHangMoi : Form
             return;
         }
 
-        if (!Regex.IsMatch(phone, @"^[0-9+ .-]{8,20}$"))
+        if (!Normalize.IsValidPhone(phone))
         {
-            ShowError("Số điện thoại phải dài 8–20 ký tự, chỉ gồm số và các ký tự + . -");
+            ShowError("Số điện thoại phải dài 8–20 chữ số, chỉ gồm số và dấu + ở đầu.");
             _txtPhone.Focus();
             return;
         }

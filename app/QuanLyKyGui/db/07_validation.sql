@@ -1,4 +1,4 @@
-USE [QuanLyKyGuiThoiTrang];
+﻿USE [QuanLyKyGuiThoiTrang];
 GO
 SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
@@ -92,11 +92,11 @@ GO
         WHERE pkg.MaKH <> p.MaKH
     )
     UNION ALL
-    SELECT 9, N'Hoa hồng 20% và tiền thực nhận tính đúng',
+    SELECT 9, N'Hoa hồng 20% và tiền thực nhận tính đúng (so với fn_HoaHong)',
     (
         SELECT COUNT(*) FROM dbo.CHI_TIET_THANH_TOAN_KY_GUI
-        WHERE TienHoaHong <> CAST(ROUND(GiaBanTinhToan * 0.20, 0) AS DECIMAL(12,0))
-           OR TienThucNhan <> GiaBanTinhToan - TienHoaHong
+        WHERE TienHoaHong <> dbo.fn_HoaHong(GiaBanTinhToan)
+           OR TienThucNhan <> dbo.fn_ThucNhan(GiaBanTinhToan)
     )
     UNION ALL
     SELECT 10, N'Trạng thái phiếu ký gửi khớp trạng thái sản phẩm',
@@ -216,3 +216,4 @@ PRINT N'===== E. DOANH THU THEO THANG =====';
 GO
 SELECT * FROM dbo.vw_DoanhThu_TheoThang ORDER BY Thang;
 GO
+

@@ -1,4 +1,4 @@
-USE [QuanLyKyGuiThoiTrang];
+﻿USE [QuanLyKyGuiThoiTrang];
 GO
 SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
@@ -144,16 +144,23 @@ BEGIN CATCH
 END CATCH;
 GO
 
-/* 10. Hủy đơn đang có giao dịch chờ xử lý */
+/* 10. Hủy đơn đang có giao dịch chờ xử lý:
+       đơn phải huỷ được và giao dịch treo tự chuyển Thất bại (không còn chặn cứng) */
 BEGIN TRY
     BEGIN TRANSACTION;
+    DECLARE @treo10 INT = (SELECT COUNT(*) FROM dbo.THANH_TOAN_DON_HANG WHERE MaDH = 27 AND TrangThai = N'Chờ xử lý');
     EXEC dbo.sp_HuyDonHang @MaDH = 27, @LyDo = N'Khách yêu cầu hủy';
+    IF NOT EXISTS (SELECT 1 FROM dbo.DON_HANG WHERE MaDH = 27 AND TrangThai = N'Đã hủy')
+        THROW 52000, N'Đơn không chuyển sang Đã hủy.', 1;
+    IF EXISTS (SELECT 1 FROM dbo.THANH_TOAN_DON_HANG WHERE MaDH = 27 AND TrangThai = N'Chờ xử lý')
+        THROW 52000, N'Giao dịch treo chưa được đóng lại.', 1;
     ROLLBACK TRANSACTION;
-    INSERT #KQ VALUES (10, N'Hủy đơn có giao dịch Chờ xử lý', N'FAIL', N'Không phát sinh lỗi.');
+    INSERT #KQ VALUES (10, N'Hủy đơn có giao dịch Chờ xử lý (tự đóng giao dịch treo)', N'PASS',
+        CONCAT(N'Đã huỷ đơn, ', @treo10, N' giao dịch treo chuyển Thất bại.'));
 END TRY
 BEGIN CATCH
     IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-    INSERT #KQ VALUES (10, N'Hủy đơn có giao dịch Chờ xử lý', N'PASS', ERROR_MESSAGE());
+    INSERT #KQ VALUES (10, N'Hủy đơn có giao dịch Chờ xử lý (tự đóng giao dịch treo)', N'FAIL', ERROR_MESSAGE());
 END CATCH;
 GO
 
@@ -368,3 +375,4 @@ DECLARE @total INT = (SELECT COUNT(*) FROM #KQ);
 PRINT N'';
 PRINT N'KET QUA: ' + CAST(@pass AS NVARCHAR(10)) + N'/' + CAST(@total AS NVARCHAR(10)) + N' bai kiem tra dat.';
 GO
+

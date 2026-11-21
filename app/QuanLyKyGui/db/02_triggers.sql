@@ -5,6 +5,18 @@ SET QUOTED_IDENTIFIER ON;
 SET XACT_ABORT ON;
 GO
 
+/* Cho phép chạy lại script an toàn (dùng trong chuỗi nâng cấp build.bat) */
+DROP TRIGGER IF EXISTS dbo.TR_SAN_PHAM;
+DROP TRIGGER IF EXISTS dbo.TR_CTDH;
+DROP TRIGGER IF EXISTS dbo.TR_DON_HANG;
+DROP TRIGGER IF EXISTS dbo.TR_THANH_TOAN;
+DROP TRIGGER IF EXISTS dbo.TR_CTTTKG;
+DROP TRIGGER IF EXISTS dbo.TR_PTTKG;
+GO
+
+DROP FUNCTION IF EXISTS dbo.fn_TrangThaiPhieuKyGui;
+GO
+
 /* ============================================================
    Hàm xác định trạng thái phiếu ký gửi từ trạng thái sản phẩm
    ============================================================ */

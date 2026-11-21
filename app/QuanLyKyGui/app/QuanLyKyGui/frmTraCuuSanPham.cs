@@ -21,9 +21,9 @@ internal sealed class frmTraCuuSanPham : Form
 
 	private readonly ComboBox _cboCustomer = Theme.Combo(195);
 
-	private readonly NumericUpDown _numFrom = Theme.Number(500000000m, 110);
+	private readonly NumericUpDown _numFrom = Theme.Number(Theme.PriceMax, 110);
 
-	private readonly NumericUpDown _numTo = Theme.Number(500000000m, 110);
+	private readonly NumericUpDown _numTo = Theme.Number(Theme.PriceMax, 110);
 
 	private readonly DataGridView _grid = new DataGridView();
 
@@ -276,8 +276,10 @@ internal sealed class frmTraCuuSanPham : Form
 			int? num = NullableInt(_cboCategory.SelectedValue);
 			int? num2 = NullableInt(_cboBrand.SelectedValue);
 			int? num3 = NullableInt(_cboCustomer.SelectedValue);
-			decimal? num4 = ((_numFrom.Value > 0m) ? new decimal?(_numFrom.Value) : ((decimal?)null));
-			decimal? num5 = ((_numTo.Value > 0m) ? new decimal?(_numTo.Value) : ((decimal?)null));
+			var giaTu = Theme.MoneyValue(_numFrom);
+			var giaDen = Theme.MoneyValue(_numTo);
+			decimal? num4 = ((giaTu > 0m) ? new decimal?(giaTu) : ((decimal?)null));
+			decimal? num5 = ((giaDen > 0m) ? new decimal?(giaDen) : ((decimal?)null));
 			SqlParameter[] ps = new SqlParameter[8]
 			{
 				new SqlParameter("@TuKhoa", SqlDbType.NVarChar, 200)
@@ -509,7 +511,7 @@ internal sealed class frmTraCuuSanPham : Form
 		}
 		try
 		{
-			Db.Execute("EXEC dbo.sp_TraHang @MaSP, @GhiChu", Db.Param("@MaSP", num), Db.Param("@GhiChu", "Người ký gửi không ký gửi nữa"));
+			Db.Execute("EXEC dbo.sp_TraHang @MaSP", Db.Param("@MaSP", num));
 			MessageBox.Show($"Đã trả sản phẩm “{value}” cho {value2}.", "Trả hàng thành công", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
 			Search();
 		}

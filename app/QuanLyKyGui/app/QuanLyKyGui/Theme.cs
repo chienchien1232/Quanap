@@ -115,7 +115,14 @@ internal static class Theme
 		};
 	}
 
-	public static NumericUpDown Number(decimal max = 1000000000m, int width = 160)
+	/// <summary>
+	/// Ô nhập số tiền.
+	/// KHÔNG đặt trần ở đây: NumericUpDown sẽ ÂM THẦM cắt giá trị về Maximum khi người
+	/// dùng gõ số lớn hơn (không báo lỗi) — đó chính là lỗi "gõ 600 triệu thành 0".
+	/// Trần nghiệp vụ kiểm bằng <see cref="PriceInRange"/> / <see cref="MoneyInRange"/>
+	/// để có thông báo rõ ràng.
+	/// </summary>
+	public static NumericUpDown Number(decimal max = decimal.MaxValue, int width = 160)
 	{
 		return new NumericUpDown
 		{
@@ -127,6 +134,66 @@ internal static class Theme
 			ThousandsSeparator = true,
 			Margin = new Padding(0, 4, 12, 10)
 		};
+	}
+
+	/// <summary>Trần giá nghiệp vụ của shop: giá đề xuất, giá đăng bán, giá chốt đơn.</summary>
+	public const decimal PriceMax = 500_000_000m;
+
+	/// <summary>Giới hạn vật lý của cột tiền trong CSDL: DECIMAL(12,0).</summary>
+	public const decimal MoneyMax = 999_999_999_999m;
+
+	/// <summary>Kiểm tra giá theo trần nghiệp vụ, trả thông báo lỗi thay vì cắt bớt.</summary>
+	public static bool PriceInRange(decimal value, out string? error)
+	{
+		if (value < 0m)
+		{
+			error = "Giá không được âm.";
+			return false;
+		}
+		if (value > PriceMax)
+		{
+			error = $"Giá không được vượt quá {PriceMax:#,##0} đ.";
+			return false;
+		}
+		error = null;
+		return true;
+	}
+
+	/// <summary>Kiểm tra số tiền thu theo giới hạn CSDL, trả thông báo lỗi thay vì cắt bớt.</summary>
+	public static bool MoneyInRange(decimal value, out string? error)
+	{
+		if (value < 0m)
+		{
+			error = "Số tiền không được âm.";
+			return false;
+		}
+		if (value > MoneyMax)
+		{
+			error = $"Số tiền vượt giới hạn cho phép ({MoneyMax:#,##0} đ).";
+			return false;
+		}
+		error = null;
+		return true;
+	}
+
+	/// <summary>
+	/// Đọc số tiền người dùng đã gõ, kể cả khi CHƯA nhấn Enter hay rời ô.
+	/// NumericUpDown chỉ cập nhật .Value khi mất focus, nên đọc thẳng .Value
+	/// ngay sau khi gõ sẽ lấy giá trị cũ.
+	/// Không kẹp về Maximum/Minimum — trả đúng số đã gõ để nơi gọi báo lỗi rõ ràng.
+	/// </summary>
+	public static decimal MoneyValue(NumericUpDown input)
+	{
+		var raw = input.Text;
+		if (string.IsNullOrWhiteSpace(raw)) return input.Value;
+
+		var digits = raw.Replace(".", string.Empty)
+		                .Replace(",", string.Empty)
+		                .Replace(" ", string.Empty)
+		                .Replace("\u00A0", string.Empty)
+		                .Trim();
+
+		return digits.Length > 0 && decimal.TryParse(digits, out var typed) ? typed : input.Value;
 	}
 
 	public static Button PrimaryButton(string text, int width = 170)

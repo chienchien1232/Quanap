@@ -17,12 +17,12 @@ internal static class EmployeeService
     public static int Add(string name, string phone, string email, string role)
     {
         name = name.Trim();
-        phone = phone.Trim();
-        email = email.Trim();
+        phone = Normalize.Phone(phone);
+        email = Normalize.Email(email);
         if (name.Length is 0 or > 100)
             throw new ArgumentException("Họ tên phải có từ 1 đến 100 ký tự.");
-        if (phone.Length > 0 && !Regex.IsMatch(phone, @"\A[0-9+ .-]{8,20}\z"))
-            throw new ArgumentException("Số điện thoại cần 8–20 ký tự, chỉ gồm số và các ký tự + . -");
+        if (phone.Length > 0 && !Normalize.IsValidPhone(phone))
+            throw new ArgumentException("Số điện thoại cần 8–20 chữ số, chỉ gồm số và dấu + ở đầu.");
         if (email.Length > 254 || (email.Length > 0 && !Regex.IsMatch(email, @"\A[^@\s]+@[^@\s]+\.[^@\s]+\z")))
             throw new ArgumentException("Email không đúng định dạng hoặc dài quá 254 ký tự.");
         if (role is not ("Nhân viên" or "Thu ngân" or "Quản lý"))

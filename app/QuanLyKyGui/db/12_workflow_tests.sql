@@ -1,4 +1,4 @@
-USE [QuanLyKyGuiThoiTrang];
+﻿USE [QuanLyKyGuiThoiTrang];
 GO
 SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
@@ -155,3 +155,4 @@ SELECT COUNT(*) AS TongSo, SUM(CASE WHEN KetQua='PASS' THEN 1 ELSE 0 END) AS Dat
 IF EXISTS (SELECT 1 FROM #KetQua WHERE KetQua='FAIL')
     THROW 52001, N'Có kiểm tra luồng ký gửi không đạt. Xem bảng kết quả.', 1;
 GO
+

@@ -55,7 +55,7 @@ internal sealed class frmTiepNhanKyGui : Form
 
 	private readonly TextBox _txtCondition = Theme.TextBox("Đã qua sử dụng, còn tốt 90%", 180);
 
-	private readonly NumericUpDown _numProposed = Theme.Number(500000000m, 120);
+	private readonly NumericUpDown _numProposed = Theme.Number(Theme.MoneyMax, 120);
 
 	private readonly DataGridView _grid = new DataGridView();
 
@@ -445,9 +445,16 @@ internal sealed class frmTiepNhanKyGui : Form
 			_cboCategory.Focus();
 			return false;
 		}
+		var proposed = Theme.MoneyValue(_numProposed);
+		if (!Theme.PriceInRange(proposed, out var priceError))
+		{
+			_lblFormError.Text = priceError;
+			_numProposed.Focus();
+			return false;
+		}
 		string text4 = _cboCategory.Text;
 		object selectedValue = _cboBrand.SelectedValue;
-		AddProductRow(text, maDm, text4, (selectedValue == null || selectedValue is DBNull) ? ((int?)null) : new int?(Convert.ToInt32(_cboBrand.SelectedValue)), _cboBrand.Text, _txtSize.Text.Trim(), _txtColor.Text.Trim(), _txtMaterial.Text.Trim(), text2, _numProposed.Value);
+		AddProductRow(text, maDm, text4, (selectedValue == null || selectedValue is DBNull) ? ((int?)null) : new int?(Convert.ToInt32(_cboBrand.SelectedValue)), _cboBrand.Text, _txtSize.Text.Trim(), _txtColor.Text.Trim(), _txtMaterial.Text.Trim(), text2, proposed);
 		_txtName.Clear();
 		_txtSize.Clear();
 		_txtColor.Clear();
@@ -537,7 +544,8 @@ internal sealed class frmTiepNhanKyGui : Form
 					};
 					sqlCommand.Parameters.AddWithValue("@MaKH", num);
 					sqlCommand.Parameters.AddWithValue("@MaNV", num2);
-					sqlCommand.Parameters.AddWithValue("@NgayKyGui", _dtpDate.Value.Date.AddHours(DateTime.Now.Hour).AddMinutes(DateTime.Now.Minute));
+					/* Giữ nguyên giây để khớp độ chính xác DATETIME2(0) của CSDL. */
+					sqlCommand.Parameters.AddWithValue("@NgayKyGui", _dtpDate.Value.Date + DateTime.Now.TimeOfDay);
 					sqlCommand.Parameters.AddWithValue("@GhiChu", (_txtNote.Text.Trim().Length == 0) ? ((IConvertible)DBNull.Value) : ((IConvertible)_txtNote.Text.Trim()));
 					sqlCommand.Parameters.Add(Db.Structured("@SanPham", "dbo.SanPhamKyGuiType", dataTable));
 					SqlParameter sqlParameter = new SqlParameter("@MaPKG", SqlDbType.Int)

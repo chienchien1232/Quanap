@@ -6,6 +6,10 @@
 __pycache__/
 *.pyc
 
+# Log file sinh ra khi chay ung dung
+**/logs/
+*.log
+
 # Agent/tooling metadata
 .commandcode/
 

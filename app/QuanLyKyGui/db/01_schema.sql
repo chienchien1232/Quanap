@@ -19,7 +19,19 @@ CREATE TABLE dbo.KHACH_HANG
     CONSTRAINT PK_KHACH_HANG PRIMARY KEY (MaKH),
     CONSTRAINT UQ_KHACH_HANG_SoDienThoai UNIQUE (SoDienThoai),
     CONSTRAINT CK_KHACH_HANG_HoTen CHECK (LEN(LTRIM(RTRIM(HoTen))) > 0),
-    CONSTRAINT CK_KHACH_HANG_SoDienThoai CHECK (LEN(SoDienThoai) BETWEEN 8 AND 20 AND SoDienThoai NOT LIKE '%[^0-9+ .-]%'),
+    CONSTRAINT CK_KHACH_HANG_SoDienThoai CHECK
+    (
+        LEN(SoDienThoai) BETWEEN 8 AND 20
+        AND
+        (
+            SoDienThoai NOT LIKE '%[^0-9]%'
+            OR
+            (
+                SoDienThoai LIKE '+%'
+                AND SUBSTRING(SoDienThoai, 2, 20) NOT LIKE '%[^0-9]%'
+            )
+        )
+    ),
     CONSTRAINT CK_KHACH_HANG_Email CHECK (Email IS NULL OR Email = '' OR Email LIKE '%_@_%._%')
 );
 GO
@@ -39,7 +51,24 @@ CREATE TABLE dbo.NHAN_VIEN
     CONSTRAINT CK_NHAN_VIEN_HoTen CHECK (LEN(LTRIM(RTRIM(HoTen))) > 0),
     CONSTRAINT CK_NHAN_VIEN_ChucVu CHECK (ChucVu IN (N'Nhân viên', N'Thu ngân', N'Quản lý')),
     CONSTRAINT CK_NHAN_VIEN_TrangThai CHECK (TrangThai IN (N'Đang làm việc', N'Đã nghỉ')),
-    CONSTRAINT CK_NHAN_VIEN_Email CHECK (Email IS NULL OR Email = '' OR Email LIKE '%_@_%._%')
+    CONSTRAINT CK_NHAN_VIEN_Email CHECK (Email IS NULL OR Email = '' OR Email LIKE '%_@_%._%'),
+    CONSTRAINT CK_NHAN_VIEN_SoDienThoai CHECK
+    (
+        SoDienThoai IS NULL
+        OR
+        (
+            LEN(SoDienThoai) BETWEEN 8 AND 20
+            AND
+            (
+                SoDienThoai NOT LIKE '%[^0-9]%'
+                OR
+                (
+                    SoDienThoai LIKE '+%'
+                    AND SUBSTRING(SoDienThoai, 2, 20) NOT LIKE '%[^0-9]%'
+                )
+            )
+        )
+    )
 );
 GO
 
@@ -115,8 +144,8 @@ CREATE TABLE dbo.SAN_PHAM
     CONSTRAINT FK_SAN_PHAM_THUONG_HIEU FOREIGN KEY (MaTH) REFERENCES dbo.THUONG_HIEU(MaTH),
     CONSTRAINT CK_SAN_PHAM_Ten CHECK (LEN(LTRIM(RTRIM(TenSP))) > 0),
     CONSTRAINT CK_SAN_PHAM_TinhTrang CHECK (LEN(LTRIM(RTRIM(TinhTrang))) > 0),
-    CONSTRAINT CK_SAN_PHAM_GiaDeXuat CHECK (GiaDeXuat IS NULL OR GiaDeXuat >= 0),
-    CONSTRAINT CK_SAN_PHAM_GiaDangBan CHECK (GiaDangBan IS NULL OR GiaDangBan >= 0),
+    CONSTRAINT CK_SAN_PHAM_GiaDeXuat CHECK (GiaDeXuat IS NULL OR GiaDeXuat BETWEEN 0 AND 500000000),
+    CONSTRAINT CK_SAN_PHAM_GiaDangBan CHECK (GiaDangBan IS NULL OR GiaDangBan BETWEEN 0 AND 500000000),
     CONSTRAINT CK_SAN_PHAM_ChuaDuyetKhongGia CHECK (TrangThaiTiepNhan = N'Đã chấp nhận' OR GiaDangBan IS NULL),
     CONSTRAINT CK_SAN_PHAM_TrangThaiTiepNhan CHECK (TrangThaiTiepNhan IN (N'Chờ xử lý', N'Đã chấp nhận', N'Từ chối')),
     CONSTRAINT CK_SAN_PHAM_TrangThaiBan CHECK (TrangThaiBan IS NULL OR TrangThaiBan IN (N'Chưa đăng bán', N'Đang bán', N'Đang giữ', N'Đã bán', N'Đã trả lại')),
@@ -175,8 +204,8 @@ CREATE TABLE dbo.CHI_TIET_DON_HANG
     CONSTRAINT FK_CHI_TIET_DON_HANG_DON_HANG FOREIGN KEY (MaDH) REFERENCES dbo.DON_HANG(MaDH),
     CONSTRAINT FK_CHI_TIET_DON_HANG_SAN_PHAM FOREIGN KEY (MaSP) REFERENCES dbo.SAN_PHAM(MaSP),
     CONSTRAINT UQ_CHI_TIET_DON_HANG_DH_SP UNIQUE (MaDH, MaSP),
-    CONSTRAINT CK_CHI_TIET_DON_HANG_Gia CHECK (GiaNiemYetLucBan >= 0),
-    CONSTRAINT CK_CHI_TIET_DON_HANG_GiamGia CHECK (GiamGia >= 0 AND GiamGia <= GiaNiemYetLucBan)
+    CONSTRAINT CK_CHI_TIET_DON_HANG_Gia CHECK (GiaNiemYetLucBan BETWEEN 0 AND 500000000),
+    CONSTRAINT CK_CHI_TIET_DON_HANG_GiamGia CHECK (GiamGia >= 0 AND GiamGia * 2 <= GiaNiemYetLucBan)
 );
 GO
 
